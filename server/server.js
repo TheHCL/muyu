@@ -47,6 +47,13 @@ setInterval(() => {
   });
 }, 5000);
 
+// Keepalive ping every 30s to prevent Render proxy from cutting idle connections
+setInterval(() => {
+  wss.clients.forEach((ws) => {
+    if (ws.readyState === ws.OPEN) ws.ping();
+  });
+}, 30000);
+
 // --- Connection handler ---
 
 wss.on('connection', (ws, req) => {

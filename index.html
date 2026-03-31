@@ -312,7 +312,7 @@
     // ── Config ──────────────────────────────────────────────
     // Set this to your Railway WebSocket URL after deploying the server.
     // Example: 'wss://muyu-production.up.railway.app'
-    const WS_URL = '';
+    const WS_URL = 'wss://muyu-kmhq.onrender.com';
     // ────────────────────────────────────────────────────────
 
     // ── State ────────────────────────────────────────────────
@@ -444,6 +444,10 @@
     function renderLeaderboard(list) {
       const ol = document.getElementById('lbList');
       ol.innerHTML = '';
+      if (list.length === 0) {
+        ol.innerHTML = '<li style="justify-content:center;color:#6b5a3a;">還沒有人敲，快來第一個！</li>';
+        return;
+      }
       list.forEach(({ nick, hits }, i) => {
         const li = document.createElement('li');
         if (nick === myNick) li.classList.add('me');
@@ -512,6 +516,10 @@
         return;
       }
 
+      // Show connecting state
+      connDot.className = 'conn-dot';
+      globalCountEl.textContent = '連線中...';
+
       ws = new WebSocket(WS_URL);
 
       ws.onopen = () => {
@@ -527,6 +535,7 @@
       ws.onclose = () => {
         setConnected(false);
         ws = null;
+        globalCountEl.textContent = '重連中...';
         setTimeout(connect, wsRetryDelay);
         wsRetryDelay = Math.min(wsRetryDelay * 2, 30000);
       };
