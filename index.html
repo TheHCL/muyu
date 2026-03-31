@@ -1,0 +1,601 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>敲木魚</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+
+    body {
+      background: #1a1208;
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      font-family: -apple-system, "PingFang TC", "Microsoft JhengHei", sans-serif;
+      user-select: none;
+      overflow: hidden;
+    }
+
+    /* ── HUD bar ── */
+    .hud {
+      position: fixed;
+      top: 0; left: 0; right: 0;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 10px 18px;
+      background: rgba(10, 7, 3, 0.75);
+      backdrop-filter: blur(6px);
+      border-bottom: 1px solid rgba(200, 160, 80, 0.15);
+      font-size: 0.82rem;
+      color: #c8a96e;
+      letter-spacing: 0.08em;
+      z-index: 100;
+    }
+
+    .hud-global { opacity: 0.9; }
+    .hud-global span { color: #f0d080; font-weight: bold; }
+
+    .hud-right { display: flex; align-items: center; gap: 14px; }
+
+    .hud-online { opacity: 0.7; }
+    .hud-online span { color: #7dd87d; font-weight: bold; }
+
+    .hud-nick {
+      display: flex; align-items: center; gap: 5px;
+      cursor: pointer;
+      opacity: 0.85;
+      transition: opacity 0.2s;
+    }
+    .hud-nick:hover { opacity: 1; }
+    .nick-text { max-width: 100px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .nick-edit-btn { font-size: 0.72rem; opacity: 0.6; }
+
+    .nick-input-wrap {
+      display: none;
+      position: fixed;
+      top: 0; left: 0; right: 0; bottom: 0;
+      background: rgba(0,0,0,0.7);
+      z-index: 200;
+      align-items: center;
+      justify-content: center;
+    }
+    .nick-input-wrap.open { display: flex; }
+    .nick-dialog {
+      background: #2a1c0a;
+      border: 1px solid rgba(200,160,80,0.3);
+      border-radius: 12px;
+      padding: 24px 28px;
+      display: flex;
+      flex-direction: column;
+      gap: 14px;
+      min-width: 260px;
+      text-align: center;
+    }
+    .nick-dialog label { color: #c8a96e; font-size: 0.9rem; }
+    .nick-dialog input {
+      background: #1a1208;
+      border: 1px solid rgba(200,160,80,0.4);
+      border-radius: 6px;
+      color: #f0d080;
+      font-size: 1rem;
+      padding: 8px 12px;
+      text-align: center;
+      outline: none;
+      font-family: inherit;
+    }
+    .nick-dialog input:focus { border-color: #c8a96e; }
+    .nick-dialog button {
+      background: #7a4b1a;
+      color: #f0d080;
+      border: none;
+      border-radius: 6px;
+      padding: 9px;
+      font-size: 0.9rem;
+      cursor: pointer;
+      font-family: inherit;
+      letter-spacing: 0.1em;
+    }
+    .nick-dialog button:hover { background: #9b6228; }
+
+    /* ── Main content ── */
+    .title {
+      color: #c8a96e;
+      font-size: 1.1rem;
+      letter-spacing: 0.4em;
+      margin-bottom: 2.5rem;
+      opacity: 0.7;
+    }
+
+    .fish-wrap {
+      position: relative;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .fish {
+      cursor: pointer;
+      transition: transform 0.05s ease;
+      filter: drop-shadow(0 8px 24px rgba(200, 120, 40, 0.4));
+      -webkit-tap-highlight-color: transparent;
+    }
+
+    .fish.bounce { animation: bounce 0.25s ease-out forwards; }
+
+    @keyframes bounce {
+      0%   { transform: scale(0.88); }
+      60%  { transform: scale(1.06); }
+      100% { transform: scale(1.0); }
+    }
+
+    .counter {
+      margin-top: 2.5rem;
+      color: #c8a96e;
+      font-size: 1.4rem;
+      letter-spacing: 0.15em;
+      opacity: 0.85;
+    }
+    .counter span { font-size: 2rem; font-weight: bold; color: #e8c87e; }
+
+    .reset-hint {
+      margin-top: 0.8rem;
+      color: #6b5a3a;
+      font-size: 0.75rem;
+      letter-spacing: 0.1em;
+    }
+
+    /* ── Leaderboard ── */
+    .lb-btn {
+      position: fixed;
+      bottom: 18px; right: 18px;
+      background: rgba(122, 75, 26, 0.85);
+      color: #f0d080;
+      border: 1px solid rgba(200,160,80,0.3);
+      border-radius: 20px;
+      padding: 7px 16px;
+      font-size: 0.8rem;
+      cursor: pointer;
+      letter-spacing: 0.1em;
+      font-family: inherit;
+      z-index: 100;
+      transition: background 0.2s;
+    }
+    .lb-btn:hover { background: rgba(155, 98, 40, 0.9); }
+
+    .lb-panel {
+      display: none;
+      position: fixed;
+      bottom: 56px; right: 18px;
+      background: rgba(15, 10, 4, 0.95);
+      border: 1px solid rgba(200,160,80,0.25);
+      border-radius: 12px;
+      padding: 16px 18px;
+      min-width: 220px;
+      z-index: 100;
+      backdrop-filter: blur(8px);
+    }
+    .lb-panel.open { display: block; }
+    .lb-title {
+      color: #c8a96e;
+      font-size: 0.85rem;
+      letter-spacing: 0.2em;
+      margin-bottom: 10px;
+      text-align: center;
+    }
+    .lb-list { list-style: none; }
+    .lb-list li {
+      display: flex;
+      justify-content: space-between;
+      gap: 12px;
+      color: #b89050;
+      font-size: 0.82rem;
+      padding: 4px 0;
+      border-bottom: 1px solid rgba(200,160,80,0.08);
+    }
+    .lb-list li:last-child { border-bottom: none; }
+    .lb-list li.me { color: #f0d080; }
+    .lb-rank { color: #6b5a3a; width: 18px; flex-shrink: 0; }
+    .lb-nick { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .lb-hits { color: #e8c87e; font-weight: bold; flex-shrink: 0; }
+
+    /* ── Floating effects ── */
+    .merit {
+      position: fixed;
+      pointer-events: none;
+      font-size: 1.1rem;
+      font-weight: bold;
+      letter-spacing: 0.05em;
+      animation: float-up 1.2s ease-out forwards;
+      transform: translateX(-50%);
+      white-space: nowrap;
+    }
+    .merit.local {
+      color: #f0d080;
+      text-shadow: 0 0 8px rgba(240, 180, 60, 0.8);
+    }
+    .merit.remote {
+      color: #a0d8ef;
+      text-shadow: 0 0 8px rgba(100, 180, 240, 0.7);
+      font-size: 0.9rem;
+    }
+
+    @keyframes float-up {
+      0%   { opacity: 1;   transform: translateX(-50%) translateY(0); }
+      100% { opacity: 0;   transform: translateX(-50%) translateY(-80px); }
+    }
+
+    .glow {
+      position: absolute;
+      width: 200px; height: 200px;
+      border-radius: 50%;
+      border: 2px solid rgba(200, 140, 60, 0.6);
+      animation: glow-out 0.5s ease-out forwards;
+      pointer-events: none;
+    }
+    @keyframes glow-out {
+      0%   { transform: scale(0.9); opacity: 0.8; }
+      100% { transform: scale(1.6); opacity: 0; }
+    }
+
+    /* ── Connection indicator ── */
+    .conn-dot {
+      width: 7px; height: 7px;
+      border-radius: 50%;
+      background: #555;
+      display: inline-block;
+      margin-right: 4px;
+      transition: background 0.4s;
+    }
+    .conn-dot.online { background: #7dd87d; }
+    .conn-dot.offline { background: #e06060; }
+  </style>
+</head>
+<body>
+
+  <!-- HUD -->
+  <div class="hud">
+    <div class="hud-global">全站功德：<span id="globalCount">-</span></div>
+    <div class="hud-right">
+      <div class="hud-online"><span class="conn-dot" id="connDot"></span>線上 <span id="onlineCount">-</span> 人</div>
+      <div class="hud-nick" id="nickBtn">
+        <span class="nick-text" id="nickDisplay">我</span>
+        <span class="nick-edit-btn">✏</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- Nick rename dialog -->
+  <div class="nick-input-wrap" id="nickWrap">
+    <div class="nick-dialog">
+      <label>修改法號</label>
+      <input type="text" id="nickInput" maxlength="20" placeholder="最多20字">
+      <button id="nickConfirm">確認</button>
+    </div>
+  </div>
+
+  <!-- Main -->
+  <div class="title">南無阿彌陀佛</div>
+
+  <div class="fish-wrap" id="fishWrap">
+    <svg class="fish" id="fish" width="180" height="180" viewBox="0 0 180 180" xmlns="http://www.w3.org/2000/svg">
+      <ellipse cx="90" cy="158" rx="52" ry="10" fill="rgba(0,0,0,0.35)"/>
+      <ellipse cx="90" cy="95" rx="62" ry="52" fill="#7a4b1a"/>
+      <ellipse cx="90" cy="93" rx="58" ry="48" fill="#9b6228"/>
+      <ellipse cx="76" cy="76" rx="22" ry="14" fill="rgba(255,200,100,0.18)" transform="rotate(-20,76,76)"/>
+      <ellipse cx="90" cy="118" rx="22" ry="7" fill="#4a2a08"/>
+      <ellipse cx="90" cy="116" rx="18" ry="5" fill="#3a1f06"/>
+      <circle cx="66" cy="82" r="7" fill="#2a1505"/>
+      <circle cx="114" cy="82" r="7" fill="#2a1505"/>
+      <circle cx="67.5" cy="80.5" r="2.5" fill="#c8a060"/>
+      <circle cx="115.5" cy="80.5" r="2.5" fill="#c8a060"/>
+      <ellipse cx="90" cy="46" rx="10" ry="14" fill="#8a5520"/>
+      <ellipse cx="90" cy="44" rx="8" ry="11" fill="#b07030"/>
+      <circle cx="90" cy="35" r="6" fill="#c88040"/>
+    </svg>
+  </div>
+
+  <div class="counter">功德：<span id="count">0</span> 下</div>
+  <div class="reset-hint">長按木魚 3 秒可重置</div>
+
+  <!-- Leaderboard -->
+  <div class="lb-panel" id="lbPanel">
+    <div class="lb-title">功德排行榜</div>
+    <ol class="lb-list" id="lbList"></ol>
+  </div>
+  <button class="lb-btn" id="lbBtn">排行榜</button>
+
+  <script>
+    // ── Config ──────────────────────────────────────────────
+    // Set this to your Railway WebSocket URL after deploying the server.
+    // Example: 'wss://muyu-production.up.railway.app'
+    const WS_URL = '';
+    // ────────────────────────────────────────────────────────
+
+    // ── State ────────────────────────────────────────────────
+    let count = parseInt(localStorage.getItem('muyu_count') || '0');
+    let myNick = localStorage.getItem('muyu_nick') || generateNick();
+    let myClientId = localStorage.getItem('muyu_cid') || (() => {
+      const id = crypto.randomUUID();
+      localStorage.setItem('muyu_cid', id);
+      return id;
+    })();
+    localStorage.setItem('muyu_nick', myNick);
+
+    const fish = document.getElementById('fish');
+    const fishWrap = document.getElementById('fishWrap');
+    const countEl = document.getElementById('count');
+    const globalCountEl = document.getElementById('globalCount');
+    const onlineCountEl = document.getElementById('onlineCount');
+    const connDot = document.getElementById('connDot');
+    const nickDisplay = document.getElementById('nickDisplay');
+
+    countEl.textContent = count;
+    nickDisplay.textContent = myNick;
+
+    // ── Nickname generator ────────────────────────────────────
+    function generateNick() {
+      const adj = ['慈悲','虔誠','安靜','清淨','善良','溫柔','智慧','寧靜','祥和','歡喜','自在','光明'];
+      const noun = ['蓮花','鐘聲','菩薩','禪心','香客','居士','行者','天龍','金剛','觀音','普賢','法師'];
+      return adj[Math.floor(Math.random()*adj.length)] + '的' + noun[Math.floor(Math.random()*noun.length)];
+    }
+
+    // ── Audio ────────────────────────────────────────────────
+    let audioCtx = null;
+    function getCtx() {
+      if (!audioCtx || audioCtx.state === 'closed') {
+        audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+      }
+      if (audioCtx.state === 'suspended') audioCtx.resume();
+      return audioCtx;
+    }
+
+    function playSound() {
+      const ctx = getCtx();
+      const t = ctx.currentTime;
+      const osc = ctx.createOscillator(), gain = ctx.createGain();
+      osc.connect(gain); gain.connect(ctx.destination);
+      osc.type = 'sine';
+      osc.frequency.setValueAtTime(290, t);
+      osc.frequency.exponentialRampToValueAtTime(180, t + 0.35);
+      gain.gain.setValueAtTime(0.7, t);
+      gain.gain.exponentialRampToValueAtTime(0.001, t + 0.45);
+      osc.start(t); osc.stop(t + 0.45);
+
+      const osc2 = ctx.createOscillator(), gain2 = ctx.createGain();
+      osc2.connect(gain2); gain2.connect(ctx.destination);
+      osc2.type = 'triangle';
+      osc2.frequency.setValueAtTime(145, t);
+      osc2.frequency.exponentialRampToValueAtTime(90, t + 0.3);
+      gain2.gain.setValueAtTime(0.3, t);
+      gain2.gain.exponentialRampToValueAtTime(0.001, t + 0.35);
+      osc2.start(t); osc2.stop(t + 0.35);
+
+      const bufSize = Math.floor(ctx.sampleRate * 0.015);
+      const buf = ctx.createBuffer(1, bufSize, ctx.sampleRate);
+      const data = buf.getChannelData(0);
+      for (let i = 0; i < bufSize; i++) data[i] = (Math.random()*2-1)*(1-i/bufSize);
+      const src = ctx.createBufferSource(), gNoise = ctx.createGain();
+      src.buffer = buf; gNoise.gain.setValueAtTime(0.25, t);
+      src.connect(gNoise); gNoise.connect(ctx.destination);
+      src.start(t);
+    }
+
+    // ── Visual effects ────────────────────────────────────────
+    function spawnMerit(x, y, text, isRemote) {
+      const el = document.createElement('div');
+      el.className = 'merit ' + (isRemote ? 'remote' : 'local');
+      el.textContent = text;
+      el.style.left = x + 'px';
+      el.style.top = y + 'px';
+      document.body.appendChild(el);
+      el.addEventListener('animationend', () => el.remove());
+    }
+
+    function spawnGlow() {
+      const el = document.createElement('div');
+      el.className = 'glow';
+      fishWrap.appendChild(el);
+      el.addEventListener('animationend', () => el.remove());
+    }
+
+    // Fish rect center (for remote merit spawn)
+    function fishCenter() {
+      const r = fish.getBoundingClientRect();
+      return { x: r.left + r.width / 2, y: r.top + r.height / 2 };
+    }
+
+    // ── Hit handler ──────────────────────────────────────────
+    function onHit(clientX, clientY) {
+      playSound();
+      fish.classList.remove('bounce');
+      void fish.offsetWidth;
+      fish.classList.add('bounce');
+      fish.addEventListener('animationend', () => fish.classList.remove('bounce'), { once: true });
+      spawnGlow();
+
+      const offsetX = (Math.random() - 0.5) * 60;
+      spawnMerit(clientX + offsetX, clientY - 20, '功德 +1', false);
+
+      count++;
+      countEl.textContent = count;
+      localStorage.setItem('muyu_count', count);
+
+      wsSend({ type: 'hit' });
+    }
+
+    // ── WebSocket ─────────────────────────────────────────────
+    let ws = null;
+    let wsRetryDelay = 1000;
+
+    function wsSend(msg) {
+      if (ws && ws.readyState === WebSocket.OPEN) {
+        ws.send(JSON.stringify(msg));
+      }
+    }
+
+    function setConnected(online) {
+      connDot.className = 'conn-dot ' + (online ? 'online' : 'offline');
+    }
+
+    function renderLeaderboard(list) {
+      const ol = document.getElementById('lbList');
+      ol.innerHTML = '';
+      list.forEach(({ nick, hits }, i) => {
+        const li = document.createElement('li');
+        if (nick === myNick) li.classList.add('me');
+        li.innerHTML = `<span class="lb-rank">${i+1}</span><span class="lb-nick">${escHtml(nick)}</span><span class="lb-hits">${hits.toLocaleString()}</span>`;
+        ol.appendChild(li);
+      });
+    }
+
+    function escHtml(s) {
+      return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+    }
+
+    function dispatch(msg) {
+      switch (msg.type) {
+        case 'init':
+          globalCountEl.textContent = msg.globalTotal.toLocaleString();
+          onlineCountEl.textContent = msg.onlineCount;
+          renderLeaderboard(msg.leaderboard);
+          // Sync nick confirmed by server
+          if (msg.nick && msg.nick !== myNick) {
+            myNick = msg.nick;
+            nickDisplay.textContent = myNick;
+            localStorage.setItem('muyu_nick', myNick);
+          }
+          // If server has more hits tracked, reflect that
+          if (msg.yourHits > count) {
+            count = msg.yourHits;
+            countEl.textContent = count;
+            localStorage.setItem('muyu_count', count);
+          }
+          break;
+
+        case 'global_hit':
+          globalCountEl.textContent = msg.globalTotal.toLocaleString();
+          // Show remote merit near fish
+          if (msg.nick && msg.nick !== myNick) {
+            const c = fishCenter();
+            const rx = c.x + (Math.random() - 0.5) * 120;
+            const ry = c.y + (Math.random() - 0.5) * 80 - 20;
+            spawnMerit(rx, ry, msg.nick + ' +1', true);
+          }
+          break;
+
+        case 'presence':
+          onlineCountEl.textContent = msg.onlineCount;
+          break;
+
+        case 'leaderboard_update':
+          renderLeaderboard(msg.leaderboard);
+          break;
+
+        case 'nick_ack':
+          myNick = msg.nick;
+          nickDisplay.textContent = myNick;
+          localStorage.setItem('muyu_nick', myNick);
+          break;
+      }
+    }
+
+    function connect() {
+      if (!WS_URL) {
+        // No server configured — offline mode
+        setConnected(false);
+        globalCountEl.textContent = '(離線)';
+        onlineCountEl.textContent = '-';
+        return;
+      }
+
+      ws = new WebSocket(WS_URL);
+
+      ws.onopen = () => {
+        setConnected(true);
+        wsRetryDelay = 1000;
+        wsSend({ type: 'join', nick: myNick, clientId: myClientId });
+      };
+
+      ws.onmessage = (e) => {
+        try { dispatch(JSON.parse(e.data)); } catch {}
+      };
+
+      ws.onclose = () => {
+        setConnected(false);
+        ws = null;
+        setTimeout(connect, wsRetryDelay);
+        wsRetryDelay = Math.min(wsRetryDelay * 2, 30000);
+      };
+
+      ws.onerror = () => { ws?.close(); };
+    }
+
+    connect();
+
+    // ── Nick rename UI ────────────────────────────────────────
+    const nickBtn = document.getElementById('nickBtn');
+    const nickWrap = document.getElementById('nickWrap');
+    const nickInput = document.getElementById('nickInput');
+    const nickConfirm = document.getElementById('nickConfirm');
+
+    nickBtn.addEventListener('click', () => {
+      nickInput.value = myNick;
+      nickWrap.classList.add('open');
+      nickInput.focus();
+      nickInput.select();
+    });
+    nickWrap.addEventListener('click', (e) => {
+      if (e.target === nickWrap) nickWrap.classList.remove('open');
+    });
+    function confirmNick() {
+      const v = nickInput.value.trim();
+      if (v.length > 0 && v.length <= 20) {
+        myNick = v;
+        nickDisplay.textContent = myNick;
+        localStorage.setItem('muyu_nick', myNick);
+        wsSend({ type: 'set_nick', nick: myNick });
+      }
+      nickWrap.classList.remove('open');
+    }
+    nickConfirm.addEventListener('click', confirmNick);
+    nickInput.addEventListener('keydown', (e) => { if (e.key === 'Enter') confirmNick(); });
+
+    // ── Leaderboard toggle ────────────────────────────────────
+    const lbBtn = document.getElementById('lbBtn');
+    const lbPanel = document.getElementById('lbPanel');
+    lbBtn.addEventListener('click', () => lbPanel.classList.toggle('open'));
+
+    // ── Fish interactions ─────────────────────────────────────
+    fish.addEventListener('click', (e) => onHit(e.clientX, e.clientY));
+
+    fish.addEventListener('touchend', (e) => {
+      e.preventDefault();
+      const t = e.changedTouches[0];
+      onHit(t.clientX, t.clientY);
+    }, { passive: false });
+
+    let pressTimer = null;
+    const startPress = () => {
+      pressTimer = setTimeout(() => {
+        if (confirm('重置功德計數？')) {
+          count = 0;
+          countEl.textContent = 0;
+          localStorage.setItem('muyu_count', 0);
+        }
+      }, 3000);
+    };
+    const cancelPress = () => clearTimeout(pressTimer);
+
+    fish.addEventListener('mousedown', startPress);
+    fish.addEventListener('mouseup', cancelPress);
+    fish.addEventListener('mouseleave', cancelPress);
+    fish.addEventListener('touchstart', startPress, { passive: true });
+    fish.addEventListener('touchend', cancelPress);
+    fish.addEventListener('touchcancel', cancelPress);
+  </script>
+</body>
+</html>
